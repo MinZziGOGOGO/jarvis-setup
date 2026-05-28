@@ -1,0 +1,10 @@
+# JarvisUI dependencies
+# Install with: pip install -r requirements.txt
+
+PyQt6
+PyQt6-WebEngine
+sounddevice
+numpy
+pywin32
+keyboard
+Pillow
