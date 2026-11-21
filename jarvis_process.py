@@ -6,6 +6,7 @@ and parses structured output (e.g. transcribed speech, command results)
 for display in the UI and log widget.
 """
 
+import os
 import subprocess
 import threading
 import time
@@ -41,6 +42,11 @@ class JarvisProcess:
     # Public API
     # ------------------------------------------------------------------
 
+    @property
+    def is_running(self) -> bool:
+        """True between start() and stop() (including automatic restarts)."""
+        return self._running
+
     def start(self):
         """Launch the subprocess and begin reading its stdout.
 
@@ -71,6 +77,8 @@ class JarvisProcess:
                     p.wait(timeout=5)
                 except (OSError, subprocess.TimeoutExpired):
                     pass
+        self._proc = None
+        self._set_state("idle")
 
     # ------------------------------------------------------------------
     # Internals
@@ -79,7 +87,7 @@ class JarvisProcess:
     def _launch(self):
         """Start the subprocess and the stdout reader thread."""
         cmd = [PYTHON_EXE, "-m", "src.jarvis.main"]
-        env = {**__import__("os").environ, "PYTHONPATH": JARVIS_PATH + "\\src"}
+        env = {**os.environ, "PYTHONPATH": os.path.join(JARVIS_PATH, "src")}
         try:
             self._proc = subprocess.Popen(
                 cmd,
@@ -91,7 +99,8 @@ class JarvisProcess:
                 encoding="utf-8",
                 errors="replace",
             )
-        except Exception:
+        except Exception as e:
+            self._log_callback(f"error: could not start Jarvis ({e})")
             self._schedule_restart()
             return
 

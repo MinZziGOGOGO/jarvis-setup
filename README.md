@@ -1,73 +1,95 @@
 # JarvisUI
 
-A floating holographic orb desktop overlay for the [Jarvis AI assistant](https://github.com/isair/jarvis), built with PyQt6 + Three.js.
+A desktop overlay for the open-source voice assistant [Jarvis](https://github.com/isair/jarvis).
+It shows the assistant as a glowing 3D point-cloud orb that reacts to what Jarvis is doing
+and to your microphone, either as a small click-through widget in the corner of the screen
+or as a fullscreen dashboard.
 
-## What It Does
+Built with PyQt6 and Three.js (rendered inside a Qt WebEngine view).
 
-JarvisUI renders a glowing purple/pink point-cloud orb that reacts in real-time to Jarvis's state and your microphone:
+![Fullscreen mode](docs/fullscreen.png)
 
-- **idle** — slow drifting orb, dim glow
-- **listening** — orb shrinks, waiting for speech
-- **thinking** — points flicker randomly, processing
-- **speaking** — orb expands with bloom-like radiance
+## Features
 
-The mic level directly affects point drift speed and connection brightness — quiet speech is subtle, loud speech is dramatic.
+- **Live state**: the orb changes with Jarvis's state, which is parsed from its console output
+  - *idle*: slow drift, dim glow
+  - *listening*: the orb contracts
+  - *thinking*: points flicker
+  - *speaking*: the orb expands and glows brighter
+- **Microphone reactive**: the input level drives how fast the points drift and how bright the
+  connections are
+- **Widget mode**: a 100×100 px transparent orb that stays on top and lets clicks pass through.
+  It hides itself while a fullscreen game is running (Windows)
+- **Fullscreen mode**: a large orb, an animated city skyline and a log panel that types out
+  Jarvis's output, plus a power button to stop Jarvis and free GPU memory
+- **Process manager**: starts Jarvis as a subprocess, streams its output and restarts it
+  automatically if it crashes
 
-## How to Launch
+## Setup
 
-### From Windows (autostart)
-The app auto-starts with Windows via registry. Reboot and it's there.
+JarvisUI expects to live in a `jarvis_ui` folder inside a Jarvis checkout that has its
+own virtual environment:
 
-### Manually
 ```
-C:\tools\jarvis\start_jarvis_ui.bat
-```
-or
-```
-C:\tools\jarvis\.venv\Scripts\python.exe C:\tools\jarvis\jarvis_ui\main.py
+jarvis/
+├── .venv/
+├── src/jarvis/...
+└── jarvis_ui/        ← this repository
 ```
 
-## Hotkeys
+```bash
+cd jarvis
+git clone https://github.com/MinZziGOGOGO/jarvis-setup.git jarvis_ui
+.venv/Scripts/pip install -r jarvis_ui/requirements.txt    # Linux/macOS: .venv/bin/pip
+```
+
+Start it with `start_jarvis_ui.bat` on Windows, or directly:
+
+```bash
+python jarvis_ui/main.py
+```
+
+Paths can also be set with environment variables: `JARVIS_PATH` (Jarvis repository),
+`JARVIS_PYTHON` (its Python interpreter) and `JARVIS_MIC_DEVICE` (input device index,
+see `python -m sounddevice`).
+
+To start JarvisUI with Windows, put a shortcut to `start_jarvis_ui.bat` into the startup
+folder (`Win+R` → `shell:startup`).
+
+## Controls
 
 | Key | Action |
 |-----|--------|
-| `Ctrl+Shift+J` | Toggle between widget mode and fullscreen mode |
-| `L` | Toggle log panel in fullscreen mode |
+| `Ctrl+Shift+J` | Switch between widget and fullscreen mode (global hotkey) |
+| `L` | Show / hide the log panel (fullscreen) |
+| `Esc` | Back to widget mode |
+| `Ctrl+Q` | Quit |
 
-## Modes
-
-### Widget Mode (default)
-A small 100×100px transparent orb in the top-left corner. Completely click-through — you can interact with anything behind it. Auto-hides when a fullscreen game is detected.
-
-### Fullscreen Mode
-The orb expands to fill the screen. Shows:
-- **Power button** (green circle) — starts/stops Jarvis to free VRAM
-- **Minimize button** (▼) — returns to widget mode
-- **City skyline** — animated window lights at the bottom
-- **Log panel** — toggle with `L` key
-
-## Autostart
-
-Registered at `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\JarvisUI`.
-
-### To disable autostart:
-```
-reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v JarvisUI /f
-```
-
-## Files
+## How it works
 
 ```
-jarvis_ui/
-  main.py              — Entry point, dual-mode app
-  orb.html             — Three.js point cloud scene
-  bridge.py            — Python→JS bridge (runJavaScript)
-  mic_listener.py      — Real-time microphone levels
-  jarvis_process.py    — Jarvis subprocess manager
-  window_detector.py   — Fullscreen game detection
-  log_widget.py        — Floating log with typewriter reveal
-  config.py            — All constants and settings
-  generate_skyline.py  — City skyline asset generator
-  assets/              — Pre-rendered skyline PNGs
-  start_jarvis_ui.bat  — Windows launcher
+ Jarvis subprocess ──stdout──▶ JarvisProcess ─┐
+ Microphone (sounddevice) ───▶ MicListener ───┼─▶ Qt signals ─▶ OrbBridge ─▶ runJavaScript() ─▶ orb.html (Three.js)
+ Foreground window (Win32) ──▶ WindowDetector ┘                  LogWidget
 ```
+
+The microphone, the subprocess reader and the window detector run on background threads.
+They never touch Qt widgets directly. Instead they emit Qt signals, which Qt delivers on
+the GUI thread. The Python side talks to the Three.js scene with one-way
+`runJavaScript("window.setState('speaking')")` calls.
+
+| File | Purpose |
+|------|---------|
+| `main.py` | Entry point, widget and fullscreen windows, mode switching |
+| `orb.html` | Three.js point-cloud orb (Three.js is bundled in `vendor/`, no internet needed) |
+| `bridge.py` | Python → JavaScript bridge, queues calls until the page has loaded |
+| `jarvis_process.py` | Starts, monitors and restarts the Jarvis subprocess |
+| `mic_listener.py` | Smoothed microphone level (RMS) |
+| `window_detector.py` | Detects fullscreen apps via the Win32 API |
+| `log_widget.py` | Draggable log panel with typewriter effect |
+| `generate_skyline.py` | Generates the skyline images in `assets/` |
+| `config.py` | Settings |
+
+## Tech stack
+
+Python · PyQt6 / Qt WebEngine · Three.js · sounddevice + NumPy · Win32 API via ctypes

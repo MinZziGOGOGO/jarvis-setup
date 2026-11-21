@@ -1,10 +1,8 @@
-# JarvisUI dependencies
-# Install with: pip install -r requirements.txt
-
+# JarvisUI dependencies — install with: pip install -r requirements.txt
 PyQt6
 PyQt6-WebEngine
 sounddevice
 numpy
-pywin32
 keyboard
+# only needed to regenerate the skyline images (generate_skyline.py)
 Pillow

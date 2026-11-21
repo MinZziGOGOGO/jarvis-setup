@@ -19,9 +19,9 @@ class LogWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool
+            Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint
         )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedSize(LOG_WIDGET_WIDTH, LOG_WIDGET_HEIGHT)
         self.setStyleSheet("""
             LogWidget {
@@ -149,35 +149,21 @@ class LogWidget(QWidget):
         self._type_timer.start(CHAR_REVEAL_DELAY_MS)
 
     def _reveal_char(self):
+        # The line being typed always lives in the last (empty) block of the document
+        cursor = self._log_edit.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
         if self._char_index < len(self._current_line):
+            ch = self._current_line[self._char_index]
             self._char_index += 1
-            partial = self._current_line[:self._char_index]
-            # Update the last block
-            cursor = self._log_edit.textCursor()
-            cursor.movePosition(cursor.MoveOperation.End)
-            # Remove last line if we overwrote it (replace ongoing line)
-            doc = self._log_edit.document()
-            if doc.blockCount() > 0:
-                last_block = doc.findBlockByNumber(doc.blockCount() - 1)
-                cursor.setPosition(last_block.position())
-                cursor.movePosition(
-                    cursor.MoveOperation.End, cursor.MoveMode.KeepAnchor
-                )
-                cursor.removeSelectedText()
-
-            # Write with color
-            fmt = self._color_for_line(self._current_line)
-            cursor.insertText(partial, fmt)
+            cursor.insertText(ch, self._color_for_line(self._current_line))
+            self._log_edit.ensureCursorVisible()
         else:
             self._type_timer.stop()
-            # Append complete line with newline
-            fmt = self._color_for_line(self._current_line)
-            self._log_edit.setCurrentCharFormat(fmt)
-            self._log_edit.append(self._current_line)
+            cursor.insertBlock()  # finished: start a fresh block for the next line
 
             # Trim old lines
             doc = self._log_edit.document()
-            while doc.blockCount() > MAX_LOG_LINES:
+            while doc.blockCount() > MAX_LOG_LINES + 1:
                 first_block = doc.findBlockByNumber(0)
                 cursor = self._log_edit.textCursor()
                 cursor.setPosition(first_block.position())

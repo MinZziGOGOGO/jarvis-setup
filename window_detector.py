@@ -1,16 +1,17 @@
 """
 Detects fullscreen games/exclusive apps on Windows using ctypes + user32.dll.
+On other systems the detector is a no-op.
 """
 import ctypes
-import threading
 import os
+import threading
 from ctypes import wintypes
 
 from config import FULLSCREEN_CHECK_INTERVAL_SEC
 
 
 # ── Windows API bindings ──
-user32 = ctypes.windll.user32
+user32 = ctypes.windll.user32 if os.name == "nt" else None
 
 # RECT struct
 class RECT(ctypes.Structure):
@@ -34,6 +35,8 @@ WS_THICKFRAME = 0x00040000
 
 def _is_fullscreen_exclusive() -> bool:
     """Check if the foreground window is fullscreen exclusive."""
+    if user32 is None:
+        return False
     hwnd = user32.GetForegroundWindow()
     if not hwnd:
         return False
@@ -72,6 +75,7 @@ class WindowDetector:
         self._was_fullscreen = False
         self._running = False
         self._thread = None
+        self._stop_event = threading.Event()
 
     def _loop(self):
         while self._running:
@@ -84,17 +88,19 @@ class WindowDetector:
                 self._was_fullscreen = is_fs
                 self._callback(is_fs)
 
-            threading.Event().wait(FULLSCREEN_CHECK_INTERVAL_SEC)
+            self._stop_event.wait(FULLSCREEN_CHECK_INTERVAL_SEC)
 
     def start(self):
-        if self._running:
+        if self._running or user32 is None:
             return
         self._running = True
+        self._stop_event.clear()
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
 
     def stop(self):
         self._running = False
+        self._stop_event.set()
 
     @property
     def is_fullscreen(self) -> bool:

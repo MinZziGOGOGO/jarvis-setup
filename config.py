@@ -1,17 +1,24 @@
 """
-JarvisUI Configuration Constants
+JarvisUI configuration.
 
-Generated from T3 task specification.
-Font choice (HACKER_FONT) based on T1 research — see RESEARCH.md.
+Paths can be overridden with environment variables so the UI works with any
+Jarvis checkout: JARVIS_PATH (the Jarvis repository) and JARVIS_PYTHON
+(the Python interpreter of its virtual environment).
 """
+import os
+import sys
 
 # ---- Microphone ----
-MIC_DEVICE_INDEX = 1
+# None = system default input device; set an index from `python -m sounddevice`
+MIC_DEVICE_INDEX = int(os.environ["JARVIS_MIC_DEVICE"]) if os.environ.get("JARVIS_MIC_DEVICE") else None
 MIC_MAX_RMS = 0.3
 
-# ---- Jarvis Process Paths (Windows) ----
-JARVIS_PATH = "C:\\tools\\jarvis"
-PYTHON_EXE = "C:\\tools\\jarvis\\.venv\\Scripts\\python.exe"
+# ---- Jarvis process ----
+# By default JarvisUI expects to live in a "jarvis_ui" folder inside the Jarvis repository
+JARVIS_PATH = os.environ.get("JARVIS_PATH", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_venv_python = os.path.join(JARVIS_PATH, ".venv", "Scripts" if os.name == "nt" else "bin",
+                            "python.exe" if os.name == "nt" else "python")
+PYTHON_EXE = os.environ.get("JARVIS_PYTHON", _venv_python if os.path.exists(_venv_python) else sys.executable)
 
 # ---- Widget Geometry ----
 WIDGET_SIZE = 100
@@ -47,6 +54,5 @@ SKYLINE_WIDTH = 1920
 SKYLINE_HEIGHT = 300
 
 # ---- Typography ----
-# Font chosen via T1 research (RESEARCH.md): Hack — purpose-built for terminals,
-# slashed zero, sharp hacker aesthetic, available on Google Fonts.
+# Hack: a terminal font with a slashed zero (falls back to any monospace font)
 HACKER_FONT = "Hack"

@@ -27,7 +27,6 @@ class MicListener:
     def _audio_callback(self, indata, frames, time_info, status):
         if status:
             warnings.warn(f"MicListener status: {status}")
-            return
         try:
             rms = float(np.sqrt(np.mean(indata ** 2)))
             with self._lock:
@@ -80,6 +79,7 @@ class MicListener:
 
     def stop(self):
         self._running = False
+        self._smoothed = 0.0
         if self._stream:
             try:
                 self._stream.stop()

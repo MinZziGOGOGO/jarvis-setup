@@ -31,10 +31,15 @@ class OrbBridge:
         else:
             self._queue.append(js)
 
+    VALID_STATES = ("idle", "listening", "thinking", "speaking")
+
     def update_state(self, state: str) -> None:
         """Set the orb's visual state. Valid: idle, listening, thinking, speaking."""
-        self._call(f"window.setState('{state}')")
+        if state in self.VALID_STATES:
+            self._call(f"window.setState('{state}')")
 
     def update_mic_level(self, level: float) -> None:
         """Push microphone level 0.0-1.0 to the orb."""
-        self._call(f"window.setMicLevel({level})")
+        if not self._ready:
+            return  # mic levels are only useful live, don't queue them
+        self._call(f"window.setMicLevel({float(level):.3f})")
